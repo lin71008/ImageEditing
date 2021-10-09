@@ -20,6 +20,8 @@
 #include <sstream>
 #include <vector>
 #include <algorithm>
+#include <random>
+#include <map>
 
 using namespace std;
 
@@ -37,17 +39,35 @@ const unsigned char BACKGROUND[3]   = { 0, 0, 0 };      // background color
 #define POS_XY(SIZE, X_MAX, Y, X) \
     ((SIZE) * ((Y) * (X_MAX) + (X)))
 
-#define RGBA32_TO_R8G8B8A8(COLOR_MAP, POS, R, G, B, A) \
-    (R) = (COLOR_MAP)[ (POS) + RED   ];\
-    (G) = (COLOR_MAP)[ (POS) + GREEN ];\
-    (B) = (COLOR_MAP)[ (POS) + BLUE  ];\
-    (A) = (COLOR_MAP)[ (POS) + ALPHA ]
+#define GET_RGBA32(COLOR_MAP, POS, COLORS) \
+    (COLORS)[ RED   ] = (COLOR_MAP)[ (POS) + RED   ];\
+    (COLORS)[ GREEN ] = (COLOR_MAP)[ (POS) + GREEN ];\
+    (COLORS)[ BLUE  ] = (COLOR_MAP)[ (POS) + BLUE  ];\
+    (COLORS)[ ALPHA ] = (COLOR_MAP)[ (POS) + ALPHA ]
 
 #define SET_RGBA32(COLOR_MAP, POS, COLORS) \
     (COLOR_MAP)[ (POS) + RED   ] = (COLORS)[ RED   ];\
     (COLOR_MAP)[ (POS) + GREEN ] = (COLORS)[ GREEN ];\
     (COLOR_MAP)[ (POS) + BLUE  ] = (COLORS)[ BLUE  ];\
     (COLOR_MAP)[ (POS) + ALPHA ] = (COLORS)[ ALPHA ]
+
+#define DIFF_RGBA32_NAIVE(COLOR_MAP, POS, COLORS) \
+    (COLOR_MAP)[ (POS) + RED   ] -= (COLORS)[ RED   ];\
+    (COLOR_MAP)[ (POS) + GREEN ] -= (COLORS)[ GREEN ];\
+    (COLOR_MAP)[ (POS) + BLUE  ] -= (COLORS)[ BLUE  ];\
+    (COLOR_MAP)[ (POS) + ALPHA ] -= (COLORS)[ ALPHA ]
+
+#define ADD_RGBA32_NAIVE(COLOR_MAP, POS, COLORS, SCALE) \
+    (COLOR_MAP)[ (POS) + RED   ] += ((COLORS)[ RED   ]) * (SCALE);\
+    (COLOR_MAP)[ (POS) + GREEN ] += ((COLORS)[ GREEN ]) * (SCALE);\
+    (COLOR_MAP)[ (POS) + BLUE  ] += ((COLORS)[ BLUE  ]) * (SCALE);\
+    (COLOR_MAP)[ (POS) + ALPHA ] += ((COLORS)[ ALPHA ]) * (SCALE)
+
+#define GET_R8G8B8A8(COLOR_MAP, POS, R, G, B, A) \
+    (R) = (COLOR_MAP)[ (POS) + RED   ];\
+    (G) = (COLOR_MAP)[ (POS) + GREEN ];\
+    (B) = (COLOR_MAP)[ (POS) + BLUE  ];\
+    (A) = (COLOR_MAP)[ (POS) + ALPHA ]
 
 #define SET_R8G8B8A8(COLOR_MAP, POS, R, G, B, A) \
     (COLOR_MAP)[ (POS) + RED   ] = R;\
@@ -236,10 +256,10 @@ TargaImage* TargaImage::Load_Image(char *filename)
 ///////////////////////////////////////////////////////////////////////////////
 bool TargaImage::To_Grayscale()
 {
-    for(int i = 0; i < 4 *(width * height); i += 4)
+    for (int i = 0; i < 4 *(width * height); i += 4)
     {
         int r, g, b, a, gray;
-        RGBA32_TO_R8G8B8A8(data, i, r, g, b, a);
+        GET_R8G8B8A8(data, i, r, g, b, a);
         gray = 0.299 * r + 0.587 * g + 0.114 * b;
         SET_R8G8B8A8(data, i, gray, gray, gray, a);
     }
@@ -255,10 +275,10 @@ bool TargaImage::To_Grayscale()
 ///////////////////////////////////////////////////////////////////////////////
 bool TargaImage::Quant_Uniform()
 {
-    for(int i = 0; i < 4 *(width * height); i += 4)
+    for (int i = 0; i < 4 *(width * height); i += 4)
     {
         unsigned char r, g, b, a;
-        RGBA32_TO_R8G8B8A8(data, i, r, g, b, a);
+        GET_R8G8B8A8(data, i, r, g, b, a);
         SET_R8G8B8A8(data, i, r & 224, g & 224, b & 192, a);  // R3G3B2
     }
     return true;
@@ -273,8 +293,65 @@ bool TargaImage::Quant_Uniform()
 ///////////////////////////////////////////////////////////////////////////////
 bool TargaImage::Quant_Populosity()
 {
-    ClearToBlack();
-    return false;
+    map <tuple<int, int, int>, int> reduce_color_counter;
+    
+    // reduce channel size to 5
+    for (int i = 0; i < 4 * width * height; i += 4)
+    {
+        int r, g, b, a;
+        GET_R8G8B8A8(data, i, r, g, b, a);
+        tuple<int, int, int> key = make_tuple(r & 248, g & 248, b & 248);
+        if (reduce_color_counter.find(key) != reduce_color_counter.end())
+        {
+            reduce_color_counter[key]++;
+        }
+        else
+        {
+            reduce_color_counter[key] = 1;
+        }
+    }
+    
+    // reduce color table
+    vector<tuple<int, int, int>> reduce_color;
+    vector<pair<tuple<int, int, int>, int>> pre_reduce_color(reduce_color_counter.begin(), reduce_color_counter.end());
+    sort(pre_reduce_color.begin(), pre_reduce_color.end(), [](const auto& x, const auto& y) {return x.second > y.second; });
+    for (int i = 0; i < 256 && i < reduce_color_counter.size(); i++)
+    {
+        reduce_color.push_back(pre_reduce_color[i].first);
+    }
+
+    for (int i = 0; i < 4 * width * height; i += 4)
+    {
+        int r, g, b, a;
+        GET_R8G8B8A8(data, i, r, g, b, a);
+        tuple<int, int, int> key = make_tuple(r & 248, g & 248, b & 248);
+        auto it = find(reduce_color.begin(), reduce_color.end(), key);
+        if (!(it != reduce_color.end()))
+        {
+            // find closest chosen color
+            int k, closest_factor = 1e6, closest_color_index = 0;
+            for (int j = 0; j < 256; ++j)
+            {
+                k = (r - get<0>(reduce_color[j])) * (r - get<0>(reduce_color[j])) + \
+                    (g - get<1>(reduce_color[j])) * (g - get<1>(reduce_color[j])) + \
+                    (b - get<2>(reduce_color[j])) * (b - get<2>(reduce_color[j]));
+                
+                if (k < closest_factor)
+                {
+                    closest_factor = k;
+                    closest_color_index = j;
+                } 
+            }
+            SET_R8G8B8A8(data, i, get<0>(reduce_color[closest_color_index]), \
+                                  get<1>(reduce_color[closest_color_index]), \
+                                  get<2>(reduce_color[closest_color_index]), a);
+        }
+        else
+        {
+            SET_R8G8B8A8(data, i, r & 248, g & 248, b & 248, a);
+        }
+    }
+    return true;
 }// Quant_Populosity
 
 
@@ -286,7 +363,8 @@ bool TargaImage::Quant_Populosity()
 bool TargaImage::Dither_Threshold()
 {
     To_Grayscale();
-	for(int i = 0; i < 4 *(width * height); i += 4)
+
+	for (int i = 0; i < 4 *(width * height); i += 4)
     {
         if (data[i] > 128)
         {
@@ -308,8 +386,23 @@ bool TargaImage::Dither_Threshold()
 ///////////////////////////////////////////////////////////////////////////////
 bool TargaImage::Dither_Random()
 {
-    ClearToBlack();
-    return false;
+    To_Grayscale();
+
+    default_random_engine generator;
+    uniform_real_distribution<float> distribution(-0.2, 0.2);
+
+    for (int i = 0; i < 4 * (width * height); i+=4)
+    {
+        if ((data[i] / 255.0) + distribution(generator) > 0.5)
+        {
+            SET_RGBA32(data, i, RGBA32_WHITE);
+        }
+        else
+        {
+            SET_RGBA32(data, i, RGBA32_BLACK);
+        }
+    }
+    return true;
 }// Dither_Random
 
 
@@ -327,7 +420,7 @@ bool TargaImage::Dither_FS()
     float* Image;
     Image = new float [width * height];
     memset(Image, 0, sizeof(float) * ((size_t) width) * ((size_t) height));
-    for(int i = 0; i < width * height; i++)
+    for (int i = 0; i < width * height; i++)
     {
         Image[i] = data[4 * i] / 255.0;
     }
@@ -342,9 +435,9 @@ bool TargaImage::Dither_FS()
             quant_error = old_pixel - new_pixel;
 
             if (!(j == width - 1))                   Image[POS_XY(1, width, i, j + 1)]     += quant_error * 7 / 16;
-            if (!(i == height -1 || j == 0))         Image[POS_XY(1, width, i + 1, j - 1)] += quant_error * 3 / 16;
-            if (!(i == height -1))                   Image[POS_XY(1, width, i + 1, j)]     += quant_error * 5 / 16;
-            if (!(i == height -1 || j == width - 1)) Image[POS_XY(1, width, i + 1, j + 1)] += quant_error * 1 / 16;
+            if (!(i == height - 1 || j == 0))         Image[POS_XY(1, width, i + 1, j - 1)] += quant_error * 3 / 16;
+            if (!(i == height - 1))                   Image[POS_XY(1, width, i + 1, j)]     += quant_error * 5 / 16;
+            if (!(i == height - 1 || j == width - 1)) Image[POS_XY(1, width, i + 1, j + 1)] += quant_error * 1 / 16;
         }
     }
 
@@ -453,8 +546,52 @@ bool TargaImage::Dither_Cluster()
 ///////////////////////////////////////////////////////////////////////////////
 bool TargaImage::Dither_Color()
 {
-    ClearToBlack();
-    return false;
+    // constants
+    const int avaliable_red_channel_vlaue[]   = { 0, 36, 73, 109, 146, 182, 219, 255 };  // 3 bits  // => total 8 bits
+    const int avaliable_green_channel_vlaue[] = { 0, 36, 73, 109, 146, 182, 219, 255 };  // 3 bits  // => total 8 bits
+    const int avaliable_blue_channel_vlaue[]  = { 0, 85, 170, 255 };       // 2 bits                // => total 8 bits
+    
+    auto find_closest_value = [](const int Arr[], const int Arr_size, int n) -> int\
+    { \
+        int result_index = 0; \
+        for (int i = 0; i < Arr_size; ++i) \
+        { \
+            if (n - Arr[i] > 0) \
+            { \
+                result_index = i; \
+            } \
+        } \
+        return Arr[result_index]; \
+    };
+
+    auto find_closest_color = [=](int color[], int result[]) -> void \
+    { \
+        result[ RED   ] = (int) find_closest_value(avaliable_red_channel_vlaue,   8, color[ RED   ]); \
+        result[ GREEN ] = (int) find_closest_value(avaliable_green_channel_vlaue, 8, color[ GREEN ]); \
+        result[ BLUE  ] = (int) find_closest_value(avaliable_blue_channel_vlaue,  4, color[ BLUE  ]); \
+        result[ ALPHA ] = color[ ALPHA ]; \
+    };
+
+    int old_pixel[4], new_pixel[4], quant_error[4];
+
+    for (int i = 0; i < height; ++i)
+    {
+        for (int j = 0; j < width; ++j)
+        {
+            GET_RGBA32(data, POS_XY(4, width, i, j), old_pixel);
+            find_closest_color(old_pixel, new_pixel);
+            SET_RGBA32(data, POS_XY(4, width, i, j), new_pixel);
+            SET_RGBA32(quant_error, 0, old_pixel);
+            DIFF_RGBA32_NAIVE(quant_error, 0, new_pixel);
+
+            if (!(j == width - 1))                   { ADD_RGBA32_NAIVE(data, POS_XY(4, width, i, j + 1),     quant_error, (7.0 / 16)); }
+            if (!(i == height - 1 || j == 0))        { ADD_RGBA32_NAIVE(data, POS_XY(4, width, i + 1, j - 1), quant_error, (3.0 / 16)); }
+            if (!(i == height -1))                   { ADD_RGBA32_NAIVE(data, POS_XY(4, width, i + 1, j),     quant_error, (5.0 / 16)); }
+            if (!(i == height -1 || j == width - 1)) { ADD_RGBA32_NAIVE(data, POS_XY(4, width, i + 1, j + 1), quant_error, (1.0 / 16)); }
+        }
+    }
+
+    return true;
 }// Dither_Color
 
 
