@@ -3,9 +3,33 @@ Image Editing
 
 Table of Contents
 -----------------
+* [TODO](#todo)
 * [Requirement](#requirement)
 * [Build](#build)
 * [Run](#run)
+
+TODO
+----
+- [x] Transform	ToGray               (5)
+- [x] Quarantined Uniform            (5)
+- [ ] Quarantined Populosity        (20)
+- [x] Dithering	Naive                (3)
+- [x] Dithering	Brightness           (7)
+- [ ] Dithering	Random               (5)
+- [x] Dithering	Cluster             (10)
+- [x] Dithering	Floyd               (15)
+- [ ] Dithering	Color Floyd         (10)
+- [ ] Filter Box                  (15/3)
+- [ ] Filter Barlette             (15/3)
+- [ ] Filter Gaussian             (15/3)
+- [ ] Filter Ab G                   (10)
+- [ ] Filter Edge Detect          (15/3)
+- [ ] Filter Edge Enhance         (15/3)
+- [ ] Resizing Half                  (8)
+- [ ] Resizing Double               (12)
+- [ ] Resizing Arbitrary Size    (25/10)
+- [ ] Resizing Arbitrary Rotate  (25/10)
+- [ ] NPR                        (15-50)
 
 Requirement
 -----------

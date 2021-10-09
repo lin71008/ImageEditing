@@ -31,7 +31,7 @@ const char      c_sNames[]          = "-names";             // display student n
 const char      c_sHeadless[]       = "-headless";          // headless command line switch
 
 // globals
-std::vector<char*>  vsStudentNames;
+vector<const char*>  vsStudentNames;
 
 
 
@@ -43,7 +43,7 @@ std::vector<char*>  vsStudentNames;
 void MakeNames()
 {
     // ************ ADD YOUR NAME HERE ****************************************
-    //vsStudentNames.push_back("Your name here!");
+    vsStudentNames.push_back("40641213S Lin Hung-Hsiang");
 }// MakeNames
 
 
@@ -54,7 +54,7 @@ void MakeNames()
 ///////////////////////////////////////////////////////////////////////////////
 void DisplayNames()
 {
-    for (std::vector<char*>::iterator i = vsStudentNames.begin(); i != vsStudentNames.end(); ++i)
+    for (vector<const char*>::iterator i = vsStudentNames.begin(); i != vsStudentNames.end(); ++i)
         cout << *i << endl;
 }// DisplayNames
 
@@ -86,7 +86,7 @@ int main(int argc, char *argv[])
     Fl::args(argc, argv, script_arg, Arg_Callback);
     if ( script_arg == 0 )
     {
-        cout <<  "Error: Unrecognised argument.\n";
+        cout <<  "Error: Unrecognized argument.\n";
 	    return 1;
     }
 
@@ -109,7 +109,7 @@ int main(int argc, char *argv[])
             CScriptHandler::HandleScriptFile(argv[i], pImage);
         else
         {
-            cerr << "Usage:" << endl << "Project1 [-names] [-headless scriptFilenames . . .]" << endl;
+            cerr << "Usage:" << endl << "ImageEditing [-names] [-headless scriptFilenames . . .]" << endl;
             return 0;
         }// else
     }// for
@@ -124,7 +124,7 @@ int main(int argc, char *argv[])
     if (!bHeadless)
     {
         // using the gui so create our window and the image widget
-        Fl_Window   window(350, 100, "CS559 Project 1");
+        Fl_Window   window(350, 100, "ImageEditing");
         Fl::visual(FL_RGB);
         window.begin();
             ImageWidget* pWidget = new ImageWidget(0, 0, 350, 100, "Image");

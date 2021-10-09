@@ -24,11 +24,36 @@
 using namespace std;
 
 // constants
-const int           RED             = 0;                // red channel
-const int           GREEN           = 1;                // green channel
-const int           BLUE            = 2;                // blue channel
+#define RED   0  // red channel
+#define GREEN 1  // green channel
+#define BLUE  2  // blue channel
+#define ALPHA 3  // alpha channel
+    
+const unsigned char RGBA32_BLACK[] = {   0,   0,   0, 255 };
+const unsigned char RGBA32_WHITE[] = { 255, 255, 255, 255 };
 const unsigned char BACKGROUND[3]   = { 0, 0, 0 };      // background color
 
+// snippet
+#define POS_XY(SIZE, X_MAX, Y, X) \
+    ((SIZE) * ((Y) * (X_MAX) + (X)))
+
+#define RGBA32_TO_R8G8B8A8(COLOR_MAP, POS, R, G, B, A) \
+    (R) = (COLOR_MAP)[ (POS) + RED   ];\
+    (G) = (COLOR_MAP)[ (POS) + GREEN ];\
+    (B) = (COLOR_MAP)[ (POS) + BLUE  ];\
+    (A) = (COLOR_MAP)[ (POS) + ALPHA ]
+
+#define SET_RGBA32(COLOR_MAP, POS, COLORS) \
+    (COLOR_MAP)[ (POS) + RED   ] = (COLORS)[ RED   ];\
+    (COLOR_MAP)[ (POS) + GREEN ] = (COLORS)[ GREEN ];\
+    (COLOR_MAP)[ (POS) + BLUE  ] = (COLORS)[ BLUE  ];\
+    (COLOR_MAP)[ (POS) + ALPHA ] = (COLORS)[ ALPHA ]
+
+#define SET_R8G8B8A8(COLOR_MAP, POS, R, G, B, A) \
+    (COLOR_MAP)[ (POS) + RED   ] = R;\
+    (COLOR_MAP)[ (POS) + GREEN ] = G;\
+    (COLOR_MAP)[ (POS) + BLUE  ] = B;\
+    (COLOR_MAP)[ (POS) + ALPHA ] = A
 
 // Computes n choose s, efficiently
 double Binomial(int n, int s)
@@ -211,8 +236,14 @@ TargaImage* TargaImage::Load_Image(char *filename)
 ///////////////////////////////////////////////////////////////////////////////
 bool TargaImage::To_Grayscale()
 {
-	ClearToBlack();
-	return false;
+    for(int i = 0; i < 4 *(width * height); i += 4)
+    {
+        int r, g, b, a, gray;
+        RGBA32_TO_R8G8B8A8(data, i, r, g, b, a);
+        gray = 0.299 * r + 0.587 * g + 0.114 * b;
+        SET_R8G8B8A8(data, i, gray, gray, gray, a);
+    }
+    return true;
 }// To_Grayscale
 
 
@@ -224,8 +255,13 @@ bool TargaImage::To_Grayscale()
 ///////////////////////////////////////////////////////////////////////////////
 bool TargaImage::Quant_Uniform()
 {
-    ClearToBlack();
-    return false;
+    for(int i = 0; i < 4 *(width * height); i += 4)
+    {
+        unsigned char r, g, b, a;
+        RGBA32_TO_R8G8B8A8(data, i, r, g, b, a);
+        SET_R8G8B8A8(data, i, r & 224, g & 224, b & 192, a);  // R3G3B2
+    }
+    return true;
 }// Quant_Uniform
 
 
@@ -249,8 +285,19 @@ bool TargaImage::Quant_Populosity()
 ///////////////////////////////////////////////////////////////////////////////
 bool TargaImage::Dither_Threshold()
 {
-    ClearToBlack();
-    return false;
+    To_Grayscale();
+	for(int i = 0; i < 4 *(width * height); i += 4)
+    {
+        if (data[i] > 128)
+        {
+            SET_RGBA32(data, i, RGBA32_WHITE);
+        }
+        else
+        {
+            SET_RGBA32(data, i, RGBA32_BLACK);
+        }
+    }
+    return true;
 }// Dither_Threshold
 
 
@@ -274,8 +321,51 @@ bool TargaImage::Dither_Random()
 ///////////////////////////////////////////////////////////////////////////////
 bool TargaImage::Dither_FS()
 {
-    ClearToBlack();
-    return false;
+    To_Grayscale();
+
+    // expend channel size
+    float* Image;
+    Image = new float [width * height];
+    memset(Image, 0, sizeof(float) * ((size_t) width) * ((size_t) height));
+    for(int i = 0; i < width * height; i++)
+    {
+        Image[i] = data[4 * i] / 255.0;
+    }
+
+    float old_pixel, new_pixel, quant_error;
+    for (int i = 0; i < height; i++)
+    {
+        for (int j = 0; j < width; j++)
+        {
+            old_pixel = Image[POS_XY(1, width, i, j)];
+            new_pixel = (old_pixel > 0.5) ? 1.0 : 0.0;
+            quant_error = old_pixel - new_pixel;
+
+            if (!(j == width - 1))                   Image[POS_XY(1, width, i, j + 1)]     += quant_error * 7 / 16;
+            if (!(i == height -1 || j == 0))         Image[POS_XY(1, width, i + 1, j - 1)] += quant_error * 3 / 16;
+            if (!(i == height -1))                   Image[POS_XY(1, width, i + 1, j)]     += quant_error * 5 / 16;
+            if (!(i == height -1 || j == width - 1)) Image[POS_XY(1, width, i + 1, j + 1)] += quant_error * 1 / 16;
+        }
+    }
+
+    // reduce channel size
+    for (int i = 0; i < height; i++)
+    {
+        for (int j = 0; j < width; j++)
+        {
+            if (Image[POS_XY(1, width, i, j)] > 0.5)
+            {
+                SET_RGBA32(data, POS_XY(4, width, i, j), RGBA32_WHITE);
+            }
+            else
+            {
+                SET_RGBA32(data, POS_XY(4, width, i, j), RGBA32_BLACK);
+            }
+        }
+    }
+    delete[] Image;
+
+    return true;
 }// Dither_FS
 
 
@@ -287,8 +377,37 @@ bool TargaImage::Dither_FS()
 ///////////////////////////////////////////////////////////////////////////////
 bool TargaImage::Dither_Bright()
 {
-    ClearToBlack();
-    return false;
+    To_Grayscale();
+
+    // initial
+    int avg = 0;
+    vector<int> bright;
+
+    // get avg
+    for (int i = 0; i < 4 * width * height; i += 4)
+    {
+        bright.push_back(data[i]);
+        avg += data[i];
+    }
+
+    // pivot: N % brightness
+    int pivot = (width * height)  - (avg / 255);
+
+    sort(bright.begin(), bright.end(), [](const auto& x, const auto& y) {return x < y; });
+    int threshold = bright[pivot];
+
+    for (int i = 0; i < 4 * width * height; i += 4)
+    {
+        if (data[i] > threshold)
+        {
+            SET_RGBA32(data, i, RGBA32_WHITE);
+        }
+        else
+        {
+            SET_RGBA32(data, i, RGBA32_BLACK);
+        }
+    }
+    return true;
 }// Dither_Bright
 
 
@@ -299,8 +418,29 @@ bool TargaImage::Dither_Bright()
 ///////////////////////////////////////////////////////////////////////////////
 bool TargaImage::Dither_Cluster()
 {
-    ClearToBlack();
-    return false;
+    To_Grayscale();
+
+    // constants
+    const float mask[4][4] = {{ 0.7059, 0.3529, 0.5882, 0.2353},
+                              { 0.0588, 0.9412, 0.8235, 0.4118},
+                              { 0.4706, 0.7647, 0.8824, 0.1176},
+                              { 0.1765, 0.5294, 0.2941, 0.6471}};
+
+    for (int i = 0; i < height; i++)
+    {
+        for (int j = 0; j < width; j++)
+        {
+            if (data[POS_XY(4, width, i, j)] / 255.0 > mask[i % 4][j % 4])
+            {
+                SET_RGBA32(data, POS_XY(4, width, i, j), RGBA32_WHITE);
+            }
+            else
+            {
+                SET_RGBA32(data, POS_XY(4, width, i, j), RGBA32_BLACK);
+            }
+        }
+    }
+    return true;
 }// Dither_Cluster
 
 
