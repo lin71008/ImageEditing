@@ -1,16 +1,19 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.1)
 
 project(ImageEditing)
+set(CMAKE_FIND_ROOT_PATH /c/MinGW/)
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+set(CMAEK_EXE_LINKER_FLAGS_INIT "-static-libgcc -static-libstdc++")
+set(CMAKE_CREATE_WIN32_EXE  "/subsystem:windowsce -mwindows")
+
 set(SRC_DIR ${PROJECT_SOURCE_DIR}/src/)
-set(INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include/)
-set(LIB_DIR ${PROJECT_SOURCE_DIR}/lib/)
 
-include_directories(${INCLUDE_DIR})
-include_directories(${LIB_DIR})
-
-# add C/C++ > preprocess: "XKEYCHECK_H"
 add_Definitions("-D_XKEYCHECK_H")
 add_definitions(-DPROJECT_DIR="${PROJECT_SOURCE_DIR}")
+
+add_library(targa ${SRC_DIR}libtarga.h ${SRC_DIR}libtarga.c)
 
 add_executable(ImageEditing 
     ${SRC_DIR}Main.cpp
@@ -23,15 +26,4 @@ add_executable(ImageEditing
     ${SRC_DIR}TargaImage.h
     ${SRC_DIR}TargaImage.cpp)
 
-add_library(libtarga ${SRC_DIR}libtarga.h ${SRC_DIR}libtarga.c)
-
-target_link_libraries(ImageEditing 
-debug ${LIB_DIR}Debug/fltk_formsd.lib      optimized ${LIB_DIR}Release/fltk_forms.lib
-debug ${LIB_DIR}Debug/fltk_gld.lib         optimized ${LIB_DIR}Release/fltk_gl.lib
-debug ${LIB_DIR}Debug/fltk_imagesd.lib     optimized ${LIB_DIR}Release/fltk_images.lib
-debug ${LIB_DIR}Debug/fltk_jpegd.lib       optimized ${LIB_DIR}Release/fltk_jpeg.lib
-debug ${LIB_DIR}Debug/fltk_pngd.lib        optimized ${LIB_DIR}Release/fltk_png.lib
-debug ${LIB_DIR}Debug/fltk_zd.lib          optimized ${LIB_DIR}Release/fltk_z.lib
-debug ${LIB_DIR}Debug/fltkd.lib            optimized ${LIB_DIR}Release/fltk.lib)
-
-target_link_libraries(ImageEditing libtarga)
+target_link_libraries(ImageEditing targa fltk fltk_images comctl32)
