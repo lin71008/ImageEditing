@@ -40,40 +40,72 @@ const unsigned char BACKGROUND[3]   = { 0, 0, 0 };      // background color
     ((SIZE) * ((Y) * (X_MAX) + (X)))
 
 #define GET_RGBA32(COLOR_MAP, POS, COLORS) \
-    (COLORS)[ RED   ] = (COLOR_MAP)[ (POS) + RED   ];\
-    (COLORS)[ GREEN ] = (COLOR_MAP)[ (POS) + GREEN ];\
-    (COLORS)[ BLUE  ] = (COLOR_MAP)[ (POS) + BLUE  ];\
-    (COLORS)[ ALPHA ] = (COLOR_MAP)[ (POS) + ALPHA ]
+    (COLORS)[ RED   ] = (COLOR_MAP)[ (POS) + RED   ]; \
+    (COLORS)[ GREEN ] = (COLOR_MAP)[ (POS) + GREEN ]; \
+    (COLORS)[ BLUE  ] = (COLOR_MAP)[ (POS) + BLUE  ]; \
+    (COLORS)[ ALPHA ] = (COLOR_MAP)[ (POS) + ALPHA ]; \
 
 #define SET_RGBA32(COLOR_MAP, POS, COLORS) \
-    (COLOR_MAP)[ (POS) + RED   ] = (COLORS)[ RED   ];\
-    (COLOR_MAP)[ (POS) + GREEN ] = (COLORS)[ GREEN ];\
-    (COLOR_MAP)[ (POS) + BLUE  ] = (COLORS)[ BLUE  ];\
-    (COLOR_MAP)[ (POS) + ALPHA ] = (COLORS)[ ALPHA ]
+    (COLOR_MAP)[ (POS) + RED   ] = (COLORS)[ RED   ]; \
+    (COLOR_MAP)[ (POS) + GREEN ] = (COLORS)[ GREEN ]; \
+    (COLOR_MAP)[ (POS) + BLUE  ] = (COLORS)[ BLUE  ]; \
+    (COLOR_MAP)[ (POS) + ALPHA ] = (COLORS)[ ALPHA ]; \
 
 #define DIFF_RGBA32_NAIVE(COLOR_MAP, POS, COLORS) \
-    (COLOR_MAP)[ (POS) + RED   ] -= (COLORS)[ RED   ];\
-    (COLOR_MAP)[ (POS) + GREEN ] -= (COLORS)[ GREEN ];\
-    (COLOR_MAP)[ (POS) + BLUE  ] -= (COLORS)[ BLUE  ];\
-    (COLOR_MAP)[ (POS) + ALPHA ] -= (COLORS)[ ALPHA ]
+    (COLOR_MAP)[ (POS) + RED   ] -= (COLORS)[ RED   ]; \
+    (COLOR_MAP)[ (POS) + GREEN ] -= (COLORS)[ GREEN ]; \
+    (COLOR_MAP)[ (POS) + BLUE  ] -= (COLORS)[ BLUE  ]; \
+    (COLOR_MAP)[ (POS) + ALPHA ] -= (COLORS)[ ALPHA ]; \
 
 #define ADD_RGBA32_NAIVE(COLOR_MAP, POS, COLORS, SCALE) \
-    (COLOR_MAP)[ (POS) + RED   ] += ((COLORS)[ RED   ]) * (SCALE);\
-    (COLOR_MAP)[ (POS) + GREEN ] += ((COLORS)[ GREEN ]) * (SCALE);\
-    (COLOR_MAP)[ (POS) + BLUE  ] += ((COLORS)[ BLUE  ]) * (SCALE);\
-    (COLOR_MAP)[ (POS) + ALPHA ] += ((COLORS)[ ALPHA ]) * (SCALE)
+    (COLOR_MAP)[ (POS) + RED   ] += (((COLORS)[ RED   ]) * (SCALE)); \
+    (COLOR_MAP)[ (POS) + GREEN ] += (((COLORS)[ GREEN ]) * (SCALE)); \
+    (COLOR_MAP)[ (POS) + BLUE  ] += (((COLORS)[ BLUE  ]) * (SCALE)); \
 
 #define GET_R8G8B8A8(COLOR_MAP, POS, R, G, B, A) \
-    (R) = (COLOR_MAP)[ (POS) + RED   ];\
-    (G) = (COLOR_MAP)[ (POS) + GREEN ];\
-    (B) = (COLOR_MAP)[ (POS) + BLUE  ];\
-    (A) = (COLOR_MAP)[ (POS) + ALPHA ]
+    (R) = (COLOR_MAP)[ (POS) + RED   ]; \
+    (G) = (COLOR_MAP)[ (POS) + GREEN ]; \
+    (B) = (COLOR_MAP)[ (POS) + BLUE  ]; \
+    (A) = (COLOR_MAP)[ (POS) + ALPHA ]; \
 
 #define SET_R8G8B8A8(COLOR_MAP, POS, R, G, B, A) \
-    (COLOR_MAP)[ (POS) + RED   ] = R;\
-    (COLOR_MAP)[ (POS) + GREEN ] = G;\
-    (COLOR_MAP)[ (POS) + BLUE  ] = B;\
-    (COLOR_MAP)[ (POS) + ALPHA ] = A
+    (COLOR_MAP)[ (POS) + RED   ] = R; \
+    (COLOR_MAP)[ (POS) + GREEN ] = G; \
+    (COLOR_MAP)[ (POS) + BLUE  ] = B; \
+    (COLOR_MAP)[ (POS) + ALPHA ] = A; \
+
+#define GET_RGBA32_SAFE(COLOR_MAP, SIZE, Y_MAX, X_MAX, Y, X, COLORS) \
+    if ( (X) >= 0 && (X) < (X_MAX) && (Y) >= 0 && (Y) < (Y_MAX)) \
+    { \
+        GET_RGBA32((COLOR_MAP), POS_XY((SIZE), (X_MAX), (Y), (X)), (COLORS));\
+    } \
+    else \
+    { \
+        SET_RGBA32((COLORS), 0, RGBA32_BLACK); \
+    }
+
+#define GET_2D_CONVOLUTION(F, F_SIZE, F_Y_MAX, F_X_MAX, G, G_Y_MAX, G_X_MAX, RESULT, Y, X, SCALE) \
+    { \
+        double __pixel_buffer_0[4], __pixel_buffer_1[4]; \
+        SET_RGBA32(__pixel_buffer_0, 0, RGBA32_BLACK);\
+        for (int __i = 0; __i < (G_Y_MAX); __i++) \
+        { \
+            for (int __j = 0; __j < (G_X_MAX); __j++) \
+            { \
+                GET_RGBA32_SAFE((F), (F_SIZE), (F_Y_MAX), (F_X_MAX), (Y) + __i, (X) + __j, __pixel_buffer_1);\
+                ADD_RGBA32_NAIVE(__pixel_buffer_0, 0, __pixel_buffer_1, (G)[__i][__j]); \
+            } \
+        } \
+        SET_RGBA32((RESULT), 0, RGBA32_BLACK); \
+        ADD_RGBA32_NAIVE((RESULT), 0, __pixel_buffer_0, (SCALE)); \
+    }
+
+#define SET_RGBA32_CUT(COLOR_MAP, POS, COLORS) \
+    (COLOR_MAP)[ (POS) + RED   ] = ((COLORS)[ RED   ]) > 0 ? (((COLORS)[ RED   ]) < 255 ? ((COLORS)[ RED   ]) : 255) : 0; \
+    (COLOR_MAP)[ (POS) + GREEN ] = ((COLORS)[ GREEN ]) > 0 ? (((COLORS)[ GREEN ]) < 255 ? ((COLORS)[ GREEN ]) : 255) : 0; \
+    (COLOR_MAP)[ (POS) + BLUE  ] = ((COLORS)[ BLUE  ]) > 0 ? (((COLORS)[ BLUE  ]) < 255 ? ((COLORS)[ BLUE  ]) : 255) : 0; \
+    (COLOR_MAP)[ (POS) + ALPHA ] = ((COLORS)[ ALPHA ]) > 0 ? (((COLORS)[ ALPHA ]) < 255 ? ((COLORS)[ ALPHA ]) : 255) : 0; \
+
 
 // Computes n choose s, efficiently
 double Binomial(int n, int s)
@@ -553,11 +585,12 @@ bool TargaImage::Dither_Color()
     
     auto find_closest_value = [](const int Arr[], const int Arr_size, int n) -> int\
     { \
-        int result_index = 0; \
+        int factor = abs(n - Arr[0]), result_index = 0; \
         for (int i = 0; i < Arr_size; ++i) \
         { \
-            if (n - Arr[i] > 0) \
+            if (abs(n - Arr[i]) < factor) \
             { \
+                factor = abs(n - Arr[i]);\
                 result_index = i; \
             } \
         } \
@@ -572,24 +605,36 @@ bool TargaImage::Dither_Color()
         result[ ALPHA ] = color[ ALPHA ]; \
     };
 
+    // expend channel size
+    float* Image = new float[4 * (width * height)];
+    for (int i = 0; i < 4 * (width * height); i += 4)
+    {
+        float pixel_buffer[4];
+        GET_RGBA32(data, i, pixel_buffer);
+        SET_RGBA32(Image, i, pixel_buffer);
+    }
+
     int old_pixel[4], new_pixel[4], quant_error[4];
 
     for (int i = 0; i < height; ++i)
     {
         for (int j = 0; j < width; ++j)
         {
-            GET_RGBA32(data, POS_XY(4, width, i, j), old_pixel);
+            GET_RGBA32(Image, POS_XY(4, width, i, j), old_pixel);
             find_closest_color(old_pixel, new_pixel);
             SET_RGBA32(data, POS_XY(4, width, i, j), new_pixel);
+            SET_RGBA32(quant_error, 0, RGBA32_BLACK);
             SET_RGBA32(quant_error, 0, old_pixel);
             DIFF_RGBA32_NAIVE(quant_error, 0, new_pixel);
 
-            if (!(j == width - 1))                   { ADD_RGBA32_NAIVE(data, POS_XY(4, width, i, j + 1),     quant_error, (7.0 / 16)); }
-            if (!(i == height - 1 || j == 0))        { ADD_RGBA32_NAIVE(data, POS_XY(4, width, i + 1, j - 1), quant_error, (3.0 / 16)); }
-            if (!(i == height -1))                   { ADD_RGBA32_NAIVE(data, POS_XY(4, width, i + 1, j),     quant_error, (5.0 / 16)); }
-            if (!(i == height -1 || j == width - 1)) { ADD_RGBA32_NAIVE(data, POS_XY(4, width, i + 1, j + 1), quant_error, (1.0 / 16)); }
+            if (!(j == width - 1))                   { ADD_RGBA32_NAIVE(Image, POS_XY(4, width, i, j + 1),     quant_error, (7.0 / 16)); }
+            if (!(i == height - 1 || j == 0))        { ADD_RGBA32_NAIVE(Image, POS_XY(4, width, i + 1, j - 1), quant_error, (3.0 / 16)); }
+            if (!(i == height -1))                   { ADD_RGBA32_NAIVE(Image, POS_XY(4, width, i + 1, j),     quant_error, (5.0 / 16)); }
+            if (!(i == height -1 || j == width - 1)) { ADD_RGBA32_NAIVE(Image, POS_XY(4, width, i + 1, j + 1), quant_error, (1.0 / 16)); }
         }
     }
+
+    delete[] Image;
 
     return true;
 }// Dither_Color
@@ -732,8 +777,35 @@ bool TargaImage::Difference(TargaImage* pImage)
 ///////////////////////////////////////////////////////////////////////////////
 bool TargaImage::Filter_Box()
 {
-    ClearToBlack();
-    return false;
+    // constants
+    const float scale = 1.0 / 9;
+    const int kernel[][3] = {{ 1, 1, 1 },
+                             { 1, 1, 1 },
+                             { 1, 1, 1 }};
+
+    // new Image
+    float* Image = new float[4 * (width * height)];
+
+    for (int i = 0; i < height; ++i)
+    {
+        for (int j = 0; j < width; ++j)
+        {
+            float pixel_buffer[4];
+            GET_2D_CONVOLUTION(data, 4, height, width, kernel, 3, 3, pixel_buffer, i-1, j-1, scale);
+            SET_RGBA32(Image, POS_XY(4, width, i, j), pixel_buffer);
+        }
+    }
+
+    // update
+    for (int i = 0; i < 4 * (width * height); i += 4)
+    {
+        float pixel_buffer[4];
+        GET_RGBA32(Image, i, pixel_buffer);
+        SET_RGBA32(data, i, pixel_buffer);
+    }
+    delete[] Image;
+
+    return true;
 }// Filter_Box
 
 
@@ -745,8 +817,37 @@ bool TargaImage::Filter_Box()
 ///////////////////////////////////////////////////////////////////////////////
 bool TargaImage::Filter_Bartlett()
 {
-    ClearToBlack();
-    return false;
+    // constants
+    const float scale = 1.0 / 81;
+    const int kernel[][5] = {{ 1, 2, 3, 2, 1 },
+                             { 2, 4, 6, 4, 2 },
+                             { 3, 6, 9, 6, 3 },
+                             { 2, 4, 6, 4, 2 },
+                             { 1, 2, 3, 2, 1 }};
+
+    // new Image
+    float* Image = new float[4 * (width * height)];
+
+    for (int i = 0; i < height; ++i)
+    {
+        for (int j = 0; j < width; ++j)
+        {
+            float pixel_buffer[4];
+            GET_2D_CONVOLUTION(data, 4, height, width, kernel, 5, 5, pixel_buffer, i-2, j-2, scale);
+            SET_RGBA32(Image, POS_XY(4, width, i, j), pixel_buffer);
+        }
+    }
+
+    // update
+    for (int i = 0; i < 4 * (width * height); i += 4)
+    {
+        float pixel_buffer[4];
+        GET_RGBA32(Image, i, pixel_buffer);
+        SET_RGBA32(data, i, pixel_buffer);
+    }
+    delete[] Image;
+
+    return true;
 }// Filter_Bartlett
 
 
@@ -758,8 +859,37 @@ bool TargaImage::Filter_Bartlett()
 ///////////////////////////////////////////////////////////////////////////////
 bool TargaImage::Filter_Gaussian()
 {
-    ClearToBlack();
-    return false;
+    // constants
+    const float scale = 1.0 / 256;
+    const int kernel[][5] = {{ 1,  4,  6,  4, 1 },
+                             { 4, 16, 24, 16, 4 },
+                             { 6, 24, 36,  6, 6 },
+                             { 4, 16, 24, 16, 4 },
+                             { 1,  4,  6,  4, 1 }};
+
+    // new Image
+    double* Image = new double[4 * (width * height)];
+
+    for (int i = 0; i < height; ++i)
+    {
+        for (int j = 0; j < width; ++j)
+        {
+            double pixel_buffer[4];
+            GET_2D_CONVOLUTION(data, 4, height, width, kernel, 5, 5, pixel_buffer, i-2, j-2, scale);
+            SET_RGBA32(Image, POS_XY(4, width, i, j), pixel_buffer);
+        }
+    }
+
+    // update
+    for (int i = 0; i < 4 * (width * height); i += 4)
+    {
+        double pixel_buffer[4];
+        GET_RGBA32(Image, i, pixel_buffer);
+        SET_RGBA32(data, i, pixel_buffer);
+    }
+    delete[] Image;
+
+    return true;
 }// Filter_Gaussian
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -771,8 +901,47 @@ bool TargaImage::Filter_Gaussian()
 
 bool TargaImage::Filter_Gaussian_N( unsigned int N )
 {
-    ClearToBlack();
-   return false;
+    // generate kernel
+    double scale = 1.0 / ((1 << (N - 1)) * (1 << (N - 1)));
+    double **kernel = new double*[N];
+    for (int i = 0; i < N; ++i)
+    {
+        kernel[i] = new double[N];
+        for (int j = 0; j < N; ++j)
+        {
+            kernel[i][j] = Binomial(N - 1, i) * Binomial(N - 1, j);
+        }
+    }
+
+    // new Image
+    int* Image = new int[4 * (width * height)];
+
+    for (int i = 0; i < height; ++i)
+    {
+        for (int j = 0; j < width; ++j)
+        {
+            double pixel_buffer[4];
+            GET_2D_CONVOLUTION(data, 4, height, width, kernel, N, N, pixel_buffer, i - ((int) (N / 2)), j - ((int) (N / 2)), scale);
+            SET_RGBA32(Image, POS_XY(4, width, i, j), pixel_buffer);
+        }
+    }
+
+    // update
+    for (int i = 0; i < 4 * (width * height); i += 4)
+    {
+        double pixel_buffer[4];
+        GET_RGBA32(Image, i, pixel_buffer);
+        SET_RGBA32(data, i, pixel_buffer);
+    }
+    delete[] Image;
+
+    for (int i = 0; i < N; ++i)
+    {
+        delete[] kernel[i];
+    }
+    delete[] kernel;
+
+    return true;
 }// Filter_Gaussian_N
 
 
@@ -784,8 +953,37 @@ bool TargaImage::Filter_Gaussian_N( unsigned int N )
 ///////////////////////////////////////////////////////////////////////////////
 bool TargaImage::Filter_Edge()
 {
-    ClearToBlack();
-    return false;
+    // constants
+    const float scale = 1.0 / 81;
+    const int kernel[][5] = {{ -1, -2, -3, -2, -1 },
+                             { -2, -4, -6, -4, -2 },
+                             { -3, -6, 72, -6, -3 },
+                             { -2, -4, -6, -4, -2 },
+                             { -1, -2, -3, -2, -1 }};
+
+    // new Image
+    double* Image = new double[4 * (width * height)];
+
+    for (int i = 0; i < height; ++i)
+    {
+        for (int j = 0; j < width; ++j)
+        {
+            double pixel_buffer[4];
+            GET_2D_CONVOLUTION(data, 4, height, width, kernel, 5, 5, pixel_buffer, i-2, j-2, scale);
+            SET_RGBA32(Image, POS_XY(4, width, i, j), pixel_buffer);
+        }
+    }
+
+    // update
+    for (int i = 0; i < 4 * (width * height); i += 4)
+    {
+        double pixel_buffer[4];
+        GET_RGBA32(Image, i, pixel_buffer);
+        SET_RGBA32_CUT(data, i, pixel_buffer);
+    }
+    delete[] Image;
+
+    return true;
 }// Filter_Edge
 
 
@@ -797,8 +995,37 @@ bool TargaImage::Filter_Edge()
 ///////////////////////////////////////////////////////////////////////////////
 bool TargaImage::Filter_Enhance()
 {
-    ClearToBlack();
-    return false;
+    // constants
+    const float scale = 1.0 / 81;
+    const int kernel[][5] = {{ -1, -2,  -3, -2, -1 },
+                             { -2, -4,  -6, -4, -2 },
+                             { -3, -6, 153, -6, -3 },
+                             { -2, -4,  -6, -4, -2 },
+                             { -1, -2,  -3, -2, -1 }};
+
+    // new Image
+    double* Image = new double[4 * (width * height)];
+
+    for (int i = 0; i < height; ++i)
+    {
+        for (int j = 0; j < width; ++j)
+        {
+            double pixel_buffer[4];
+            GET_2D_CONVOLUTION(data, 4, height, width, kernel, 5, 5, pixel_buffer, i-2, j-2, scale);
+            SET_RGBA32(Image, POS_XY(4, width, i, j), pixel_buffer);
+        }
+    }
+
+    // update
+    for (int i = 0; i < 4 * (width * height); i += 4)
+    {
+        double pixel_buffer[4];
+        GET_RGBA32(Image, i, pixel_buffer);
+        SET_RGBA32_CUT(data, i, pixel_buffer);
+    }
+    delete[] Image;
+
+    return true;
 }// Filter_Enhance
 
 
