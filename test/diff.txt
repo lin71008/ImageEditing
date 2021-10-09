@@ -1,0 +1,3 @@
+load ../images/wiz.tga
+diff
+save test_result/diff.tga

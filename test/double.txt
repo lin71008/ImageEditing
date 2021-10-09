@@ -1,0 +1,3 @@
+load ../images/wiz.tga
+double
+save test_result/double.tga

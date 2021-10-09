@@ -1,0 +1,3 @@
+load ../images/wiz.tga
+filter-bartlett
+save test_result/filter-bartlett.tga

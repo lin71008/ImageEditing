@@ -1,0 +1,3 @@
+load ../images/wiz.tga
+dither-fs
+save test_result/dither-fs.tga

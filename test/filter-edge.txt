@@ -1,0 +1,3 @@
+load ../images/wiz.tga
+filter-edge
+save test_result/filter-edge.tga

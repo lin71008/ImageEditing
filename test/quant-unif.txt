@@ -1,0 +1,3 @@
+load ../images/wiz.tga
+quant-unif
+save test_result/quant-unif.tga
