@@ -25,7 +25,7 @@ TODO
 - [x] Filter Ab G                   (10)
 - [x] Filter Edge Detect          (15/3)
 - [x] Filter Edge Enhance         (15/3)
-- [ ] Resizing Half                  (8)
+- [x] Resizing Half                  (8)
 - [ ] Resizing Double               (12)
 - [ ] Resizing Arbitrary Size    (25/10)
 - [ ] Resizing Arbitrary Rotate  (25/10)

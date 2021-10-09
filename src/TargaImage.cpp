@@ -1052,8 +1052,37 @@ bool TargaImage::NPR_Paint()
 ///////////////////////////////////////////////////////////////////////////////
 bool TargaImage::Half_Size()
 {
-    ClearToBlack();
-    return false;
+    // constants
+    const float scale = 1.0 / 16;
+    const int kernel[][3] = {{ 1, 2, 1 },
+                             { 2, 4, 2 },
+                             { 1, 2, 1 }};
+
+    // new Image
+    int* Image = new int[4 * ((width / 2) * (height / 2))];
+
+    for (int i = 0; i < (height / 2); ++i)
+    {
+        for (int j = 0; j < (width / 2); ++j)
+        {
+            int pixel_buffer[4];
+            GET_2D_CONVOLUTION(data, 4, height, width, kernel, 3, 3, pixel_buffer, (2 * i)-1, (2 * j)-1, scale);
+            SET_RGBA32(Image, POS_XY(4, (width / 2), i, j), pixel_buffer);
+        }
+    }
+
+    // update
+    for (int i = 0; i < 4 * ((width / 2) * (height / 2)); i += 4)
+    {
+        int pixel_buffer[4];
+        GET_RGBA32(Image, i, pixel_buffer);
+        SET_RGBA32_CUT(data, i, pixel_buffer);
+    }
+    width = (width / 2);
+    height = (height / 2);
+    delete[] Image;
+
+    return true;
 }// Half_Size
 
 
