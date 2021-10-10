@@ -1,3 +1,0 @@
-load ../images/wiz.tga
-dither-pattern
-save test_result/dither-pattern.tga

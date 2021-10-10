@@ -1,3 +1,0 @@
-load ../images/wiz.tga
-comp-xor
-save test_result/comp-xor.tga

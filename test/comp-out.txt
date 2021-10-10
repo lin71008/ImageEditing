@@ -1,3 +1,0 @@
-load ../images/wiz.tga
-comp-out
-save test_result/comp-out.tga

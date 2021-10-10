@@ -26,9 +26,9 @@ TODO
 - [x] Filter Edge Detect          (15/3)
 - [x] Filter Edge Enhance         (15/3)
 - [x] Resizing Half                  (8)
-- [ ] Resizing Double               (12)
-- [ ] Resizing Arbitrary Size    (25/10)
-- [ ] Resizing Arbitrary Rotate  (25/10)
+- [x] Resizing Double               (12)
+- [x] Resizing Arbitrary Size    (25/10)
+- [x] Resizing Arbitrary Rotate  (25/10)
 - [ ] NPR                        (15-50)
 
 Requirement

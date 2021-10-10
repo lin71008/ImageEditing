@@ -31,6 +31,7 @@ using namespace std;
 #define BLUE  2  // blue channel
 #define ALPHA 3  // alpha channel
     
+const unsigned char RGBA32_BLANK[] = {   0,   0,   0,   0 };
 const unsigned char RGBA32_BLACK[] = {   0,   0,   0, 255 };
 const unsigned char RGBA32_WHITE[] = { 255, 255, 255, 255 };
 const unsigned char BACKGROUND[3]   = { 0, 0, 0 };      // background color
@@ -74,30 +75,45 @@ const unsigned char BACKGROUND[3]   = { 0, 0, 0 };      // background color
     (COLOR_MAP)[ (POS) + BLUE  ] = B; \
     (COLOR_MAP)[ (POS) + ALPHA ] = A; \
 
+static unsigned int __GET_RGBA32_SAFE = 0;
 #define GET_RGBA32_SAFE(COLOR_MAP, SIZE, Y_MAX, X_MAX, Y, X, COLORS) \
     if ( (X) >= 0 && (X) < (X_MAX) && (Y) >= 0 && (Y) < (Y_MAX)) \
     { \
         GET_RGBA32((COLOR_MAP), POS_XY((SIZE), (X_MAX), (Y), (X)), (COLORS));\
+        __GET_RGBA32_SAFE = 1; \
     } \
     else \
     { \
-        SET_RGBA32((COLORS), 0, RGBA32_BLACK); \
+        SET_RGBA32((COLORS), 0, RGBA32_BLANK); \
+        __GET_RGBA32_SAFE = 0; \
     }
 
 #define GET_2D_CONVOLUTION(F, F_SIZE, F_Y_MAX, F_X_MAX, G, G_Y_MAX, G_X_MAX, RESULT, Y, X, SCALE) \
     { \
+        bool __not_blank = false; \
         double __pixel_buffer_0[4], __pixel_buffer_1[4]; \
-        SET_RGBA32(__pixel_buffer_0, 0, RGBA32_BLACK);\
+        SET_RGBA32(__pixel_buffer_0, 0, RGBA32_BLANK);\
         for (int __i = 0; __i < (G_Y_MAX); __i++) \
         { \
             for (int __j = 0; __j < (G_X_MAX); __j++) \
             { \
                 GET_RGBA32_SAFE((F), (F_SIZE), (F_Y_MAX), (F_X_MAX), (Y) + __i, (X) + __j, __pixel_buffer_1);\
+                if ( __GET_RGBA32_SAFE ) \
+                { \
+                    __not_blank = true; \
+                } \
                 ADD_RGBA32_NAIVE(__pixel_buffer_0, 0, __pixel_buffer_1, (G)[__i][__j]); \
             } \
         } \
-        SET_RGBA32((RESULT), 0, RGBA32_BLACK); \
-        ADD_RGBA32_NAIVE((RESULT), 0, __pixel_buffer_0, (SCALE)); \
+        if ( __not_blank ) \
+        { \
+            SET_RGBA32((RESULT), 0, RGBA32_BLACK); \
+            ADD_RGBA32_NAIVE((RESULT), 0, __pixel_buffer_0, (SCALE)); \
+        } \
+        else \
+        { \
+            SET_RGBA32((RESULT), 0, RGBA32_BLANK); \
+        } \
     }
 
 #define SET_RGBA32_CUT(COLOR_MAP, POS, COLORS) \
@@ -778,10 +794,12 @@ bool TargaImage::Difference(TargaImage* pImage)
 bool TargaImage::Filter_Box()
 {
     // constants
-    const float scale = 1.0 / 9;
-    const int kernel[][3] = {{ 1, 1, 1 },
-                             { 1, 1, 1 },
-                             { 1, 1, 1 }};
+    const float scale = 1.0 / 25;
+    const int kernel[][5] = {{ 1, 1, 1, 1, 1 },
+                             { 1, 1, 1, 1, 1 },
+                             { 1, 1, 1, 1, 1 },
+                             { 1, 1, 1, 1, 1 },
+                             { 1, 1, 1, 1, 1 }};
 
     // new Image
     float* Image = new float[4 * (width * height)];
@@ -791,7 +809,7 @@ bool TargaImage::Filter_Box()
         for (int j = 0; j < width; ++j)
         {
             float pixel_buffer[4];
-            GET_2D_CONVOLUTION(data, 4, height, width, kernel, 3, 3, pixel_buffer, i-1, j-1, scale);
+            GET_2D_CONVOLUTION(data, 4, height, width, kernel, 5, 5, pixel_buffer, i-2, j-2, scale);
             SET_RGBA32(Image, POS_XY(4, width, i, j), pixel_buffer);
         }
     }
@@ -1052,37 +1070,7 @@ bool TargaImage::NPR_Paint()
 ///////////////////////////////////////////////////////////////////////////////
 bool TargaImage::Half_Size()
 {
-    // constants
-    const float scale = 1.0 / 16;
-    const int kernel[][3] = {{ 1, 2, 1 },
-                             { 2, 4, 2 },
-                             { 1, 2, 1 }};
-
-    // new Image
-    int* Image = new int[4 * ((width / 2) * (height / 2))];
-
-    for (int i = 0; i < (height / 2); ++i)
-    {
-        for (int j = 0; j < (width / 2); ++j)
-        {
-            int pixel_buffer[4];
-            GET_2D_CONVOLUTION(data, 4, height, width, kernel, 3, 3, pixel_buffer, (2 * i)-1, (2 * j)-1, scale);
-            SET_RGBA32(Image, POS_XY(4, (width / 2), i, j), pixel_buffer);
-        }
-    }
-
-    // update
-    for (int i = 0; i < 4 * ((width / 2) * (height / 2)); i += 4)
-    {
-        int pixel_buffer[4];
-        GET_RGBA32(Image, i, pixel_buffer);
-        SET_RGBA32_CUT(data, i, pixel_buffer);
-    }
-    width = (width / 2);
-    height = (height / 2);
-    delete[] Image;
-
-    return true;
+    return Resize(0.5);
 }// Half_Size
 
 
@@ -1093,8 +1081,7 @@ bool TargaImage::Half_Size()
 ///////////////////////////////////////////////////////////////////////////////
 bool TargaImage::Double_Size()
 {
-    ClearToBlack();
-    return false;
+    return Resize(2.0);
 }// Double_Size
 
 
@@ -1106,8 +1093,68 @@ bool TargaImage::Double_Size()
 ///////////////////////////////////////////////////////////////////////////////
 bool TargaImage::Resize(float scale)
 {
-    ClearToBlack();
-    return false;
+    // constants
+    const float scale_00 = 1.0 / 16;
+    const int kernel_00[][3] = {{ 1, 2, 1 },
+                                { 2, 4, 2 },
+                                { 1, 2, 1 }};
+    const float scale_01 = 1.0 / 32;
+    const int kernel_01[][3] = {{ 1, 2, 1 },
+                                { 3, 6, 3 },
+                                { 3, 6, 3 },
+                                { 1, 2, 1 }};
+    const float scale_10 = 1.0 / 32;
+    const int kernel_10[][4] = {{ 1, 3, 3, 1 },
+                                { 2, 6, 6, 2 },
+                                { 1, 3, 3, 1 }};
+    const float scale_11 = 1.0 / 64;
+    const int kernel_11[][4] = {{ 1, 3, 3, 1 },
+                                { 3, 9, 9, 3 },
+                                { 3, 9, 9, 3 },
+                                { 1, 3, 3, 1 }};
+
+    // new Image
+    int* Image = new int[4 * (((int)(width * scale)) * ((int)(height * scale)))];
+
+    for (int i = 0; i < ((int)(height * scale)); ++i)
+    {
+        for (int j = 0; j < ((int)(width * scale)); ++j)
+        {
+            int pixel_buffer[4];
+            if (!(i % 2) && !(j % 2))
+            {
+                GET_2D_CONVOLUTION(data, 4, height, width, kernel_00, 3, 3, pixel_buffer, ((int)(i / scale))-1, ((int)(j / scale))-1, scale_00);
+            }
+            else if ((i % 2) && !(j % 2))
+            {
+                GET_2D_CONVOLUTION(data, 4, height, width, kernel_01, 4, 3, pixel_buffer, ((int)(i / scale))-1, ((int)(j / scale))-1, scale_01);
+            }
+            else if (!(i % 2) && (j % 2))
+            {
+                GET_2D_CONVOLUTION(data, 4, height, width, kernel_10, 3, 4, pixel_buffer, ((int)(i / scale))-1, ((int)(j / scale))-1, scale_10);
+            }
+            else
+            {
+                GET_2D_CONVOLUTION(data, 4, height, width, kernel_11, 4, 4, pixel_buffer, ((int)(i / scale))-1, ((int)(j / scale))-1, scale_11);
+            }
+            SET_RGBA32(Image, POS_XY(4, ((int)(width * scale)), i, j), pixel_buffer);
+        }
+    }
+
+    // update
+    free(this->data);
+    this->data = new unsigned char[4 * (((int)(width * scale)) * ((int)(height * scale)))];
+    for (int i = 0; i < 4 * (((int)(width * scale)) * ((int)(height * scale))); i += 4)
+    {
+        int pixel_buffer[4];
+        GET_RGBA32(Image, i, pixel_buffer);
+        SET_RGBA32_CUT(data, i, pixel_buffer);
+    }
+    width = ((int)(width * scale));
+    height = ((int)(height * scale));
+    delete[] Image;
+
+    return true;
 }// Resize
 
 
@@ -1119,8 +1166,34 @@ bool TargaImage::Resize(float scale)
 ///////////////////////////////////////////////////////////////////////////////
 bool TargaImage::Rotate(float angleDegrees)
 {
-    ClearToBlack();
-    return false;
+    // constants
+    const float radians = DegreesToRadians(angleDegrees);
+
+    // new Image
+    float* Image = new float[4 * (width * height)];
+
+    for (int i = 0; i < height; ++i)
+    {
+        for (int j = 0; j < width; ++j)
+        {
+            int x = (j - (width / 2)) *  cos(radians) + (i - (height / 2)) * sin(radians) + (width / 2);
+            int y = (j - (width / 2)) * -sin(radians) + (i - (height / 2)) * cos(radians) + (height / 2);
+            float pixel_buffer[4];
+            GET_RGBA32_SAFE(data, 4, height, width, y, x, pixel_buffer);
+            SET_RGBA32(Image, POS_XY(4, width, i, j), pixel_buffer);
+        }
+    }
+
+    // update
+    for (int i = 0; i < 4 * (width * height); i += 4)
+    {
+        float pixel_buffer[4];
+        GET_RGBA32(Image, i, pixel_buffer);
+        SET_RGBA32_CUT(data, i, pixel_buffer);
+    }
+    delete[] Image;
+
+    return true;
 }// Rotate
 
 
