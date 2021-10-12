@@ -877,37 +877,7 @@ bool TargaImage::Filter_Bartlett()
 ///////////////////////////////////////////////////////////////////////////////
 bool TargaImage::Filter_Gaussian()
 {
-    // constants
-    const float scale = 1.0 / 256;
-    const int kernel[][5] = {{ 1,  4,  6,  4, 1 },
-                             { 4, 16, 24, 16, 4 },
-                             { 6, 24, 36,  6, 6 },
-                             { 4, 16, 24, 16, 4 },
-                             { 1,  4,  6,  4, 1 }};
-
-    // new Image
-    double* Image = new double[4 * (width * height)];
-
-    for (int i = 0; i < height; ++i)
-    {
-        for (int j = 0; j < width; ++j)
-        {
-            double pixel_buffer[4];
-            GET_2D_CONVOLUTION(data, 4, height, width, kernel, 5, 5, pixel_buffer, i-2, j-2, scale);
-            SET_RGBA32(Image, POS_XY(4, width, i, j), pixel_buffer);
-        }
-    }
-
-    // update
-    for (int i = 0; i < 4 * (width * height); i += 4)
-    {
-        double pixel_buffer[4];
-        GET_RGBA32(Image, i, pixel_buffer);
-        SET_RGBA32(data, i, pixel_buffer);
-    }
-    delete[] Image;
-
-    return true;
+    return Filter_Gaussian_N(5);
 }// Filter_Gaussian
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -920,14 +890,15 @@ bool TargaImage::Filter_Gaussian()
 bool TargaImage::Filter_Gaussian_N( unsigned int N )
 {
     // generate kernel
-    double scale = 1.0 / ((1 << (N - 1)) * (1 << (N - 1)));
+    double scale = 1.0;
     double **kernel = new double*[N];
     for (int i = 0; i < N; ++i)
     {
         kernel[i] = new double[N];
         for (int j = 0; j < N; ++j)
         {
-            kernel[i][j] = Binomial(N - 1, i) * Binomial(N - 1, j);
+            kernel[i][j] = Binomial(N - 1, i) / (1 << (N - 1)) * \
+                           Binomial(N - 1, j) / (1 << (N - 1));
         }
     }
 
@@ -1058,7 +1029,7 @@ bool TargaImage::Filter_Enhance()
 bool TargaImage::NPR_Paint()
 {
     // constants
-    const int Brush_Size[] = { 32, 16, 4 };
+    const int Brush_Size[] = { 7, 3, 1 };
 
     // copied of original image
     int* Original = new int[4 * (width * height)];
@@ -1075,38 +1046,72 @@ bool TargaImage::NPR_Paint()
     // brush size = ...
     for (int b = 0; b < 3; ++b)
     {
-        double scale = 1.0 / (Brush_Size[b] * Brush_Size[b]);
-        int** kernel = new int* [Brush_Size[b]];
-        for (int i = 0; i < Brush_Size[b]; ++i)
+        // using box filter to get avg color in [-b, -b] to [b, b]
+        int box_filter_size = Brush_Size[b];
+        double box_filter_scale = 1 / box_filter_size;
+        double** box_filter_kernal = new double* [box_filter_size];
+        for (int i = 0; i < box_filter_size; ++i)
         {
-            kernel[i] = new int[Brush_Size[b]];
-            for (int j = 0; j < Brush_Size[b]; ++j)
+            box_filter_kernal[i] = new double [box_filter_size];
+            for (int j = 0; j < box_filter_size; ++j)
             {
-                kernel[i][j] = 1;
+                box_filter_kernal[i][j] = 1 / box_filter_size;
             }
         }
 
-        vector<Stroke> stroke_pool = {};
+        // using gauss filter to get brush color in [-r, -r] to [r, r]
+        int gaussian_filter_size = (2 * Brush_Size[b] + 1);
+        double gaussian_filter_scale = 1.0;
+        double** gaussian_filter_kernal = new double* [gaussian_filter_size];
+        for (int i = 0; i < gaussian_filter_size; ++i)
+        {
+            gaussian_filter_kernal[i] = new double [gaussian_filter_size];
+            for (int j = 0; j < gaussian_filter_size; ++j)
+            {
+                gaussian_filter_kernal[i][j] = (Binomial((gaussian_filter_size - 1), i) / (1 << (gaussian_filter_size - 1))) * \
+                                               (Binomial((gaussian_filter_size - 1), j) / (1 << (gaussian_filter_size - 1)));
+            }
+        }
+
+        vector<Stroke> stroke_pool;
 
         for (int i = 0; i < height; i += Brush_Size[b])
         {
             for (int j = 0; j < width; j += Brush_Size[b])
             {
-                double pixel_buffer_old[4], pixel_buffer_new[4];                
+                double current_color[4], brush_color[4];
+                GET_2D_CONVOLUTION(Original, 4, height, width, \
+                                   gaussian_filter_kernal, gaussian_filter_size, gaussian_filter_size, \
+                                   brush_color, ((int) i - Brush_Size[b]), ((int) j - Brush_Size[b]), 1.0);
 
-                // avg color for original & current canvas at given location
-                GET_2D_CONVOLUTION(data, 4, height, width, kernel, Brush_Size[b], Brush_Size[b], pixel_buffer_old, i - ((int) (Brush_Size[b] / 2)), j - ((int) (Brush_Size[b] / 2)), scale);
-                GET_2D_CONVOLUTION(Original, 4, height, width, kernel, Brush_Size[b], Brush_Size[b], pixel_buffer_new, i - ((int) (Brush_Size[b] / 2)), j - ((int) (Brush_Size[b] / 2)), scale);
-                
-                double pixel_buffer_err = abs((pixel_buffer_old[ RED ] + pixel_buffer_old[ GREEN ] + pixel_buffer_old[ BLUE ]) - \
-                                              (pixel_buffer_new[ RED ] + pixel_buffer_new[ GREEN ] + pixel_buffer_new[ BLUE ]));
-                
-                // T = ... ? I don't know
-                if ( !b || pixel_buffer_err * (Brush_Size[b] * Brush_Size[b]) > 512 )
+                GET_2D_CONVOLUTION(data, 4, height, width, \
+                                   box_filter_kernal, box_filter_size, box_filter_size, \
+                                   current_color, ((int) i - ((int) Brush_Size[b] / 2)), ((int) j - ((int) Brush_Size[b] / 2)), box_filter_scale);
+
+                // first layer or color diff > 100
+                if (!b || abs(brush_color[0] + brush_color[1] + brush_color[2] - current_color[0] - current_color[1] - current_color[2]) > 125)
                 {
-                    int y = i + rand() % 5 - 2;
-                    int x = j + rand() % 5 - 2;
-                   stroke_pool.push_back(Stroke(Brush_Size[b], x, y, pixel_buffer_new[ RED ], pixel_buffer_new[ GREEN ], pixel_buffer_new[ BLUE ], pixel_buffer_new[ ALPHA ]));
+                    int x = j, y = i, large_error = 0;
+                    for (int di = -((int) Brush_Size[b] / 2); b && di < ((int) Brush_Size[b] / 2); ++di)
+                    {
+                        for (int dj = -((int) Brush_Size[b] / 2); b && dj < ((int) Brush_Size[b] / 2); ++dj)
+                        {
+                            int pixel_buffer[4];
+                            GET_RGBA32_SAFE(Original, 4, height, width, i + di, j + dj, pixel_buffer);
+                            if (__GET_RGBA32_SAFE)
+                            {
+                                int pixel_buffer_error = abs((pixel_buffer[ RED ] + pixel_buffer[ GREEN ] + pixel_buffer[ BLUE ]) - \
+                                                             (current_color[ RED ] + current_color[ GREEN ] + current_color[ BLUE ]));
+                                if (pixel_buffer_error > large_error)
+                                {
+                                    large_error = pixel_buffer_error;
+                                    y = i + di;
+                                    x = j + dj;
+                                }
+                            }
+                        }
+                    }
+                    stroke_pool.push_back(Stroke(Brush_Size[b], x, y, brush_color[ RED ], brush_color[ GREEN ], brush_color[ BLUE ], brush_color[ ALPHA ]));
                 }
             }
         }
@@ -1118,11 +1123,17 @@ bool TargaImage::NPR_Paint()
             Paint_Stroke(*i);
         }
 
-        for (int i = 0; i < Brush_Size[b]; ++i)
+        for (int i = 0; i < box_filter_size; ++i)
         {
-            delete[] kernel;
+            delete[] box_filter_kernal[i];
         }
-        delete[] kernel;
+        delete[] box_filter_kernal;
+
+        for (int i = 0; i < gaussian_filter_size; ++i)
+        {
+            delete[] gaussian_filter_kernal[i];
+        }
+        delete[] gaussian_filter_kernal;
     }
 
     delete[] Original;

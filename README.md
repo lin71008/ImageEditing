@@ -6,7 +6,6 @@ Table of Contents
 * [Requirement](#requirement)
 * [Build](#build)
 * [Run](#run)
-* [Problem](#problem)
 
 Requirement
 -----------
@@ -31,7 +30,3 @@ Run
 All executable files can be run both in console or in window form.
 
 You can run `<program> --help` to see more information.
-
-Problem
--------
-The algorithm of `NPR_Paint` may be incorrect. 
