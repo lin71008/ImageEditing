@@ -1057,8 +1057,77 @@ bool TargaImage::Filter_Enhance()
 ///////////////////////////////////////////////////////////////////////////////
 bool TargaImage::NPR_Paint()
 {
+    // constants
+    const int Brush_Size[] = { 32, 16, 4 };
+
+    // copied of original image
+    int* Original = new int[4 * (width * height)];
+    for (int i = 0; i < 4 * (width * height); i += 4)
+    {
+        int pixel_buffer[4];
+        GET_RGBA32(data, i, pixel_buffer);
+        SET_RGBA32(Original, i, pixel_buffer);
+    }
+
+    // new canvas
     ClearToBlack();
-    return false;
+
+    // brush size = ...
+    for (int b = 0; b < 3; ++b)
+    {
+        double scale = 1.0 / (Brush_Size[b] * Brush_Size[b]);
+        int** kernel = new int* [Brush_Size[b]];
+        for (int i = 0; i < Brush_Size[b]; ++i)
+        {
+            kernel[i] = new int[Brush_Size[b]];
+            for (int j = 0; j < Brush_Size[b]; ++j)
+            {
+                kernel[i][j] = 1;
+            }
+        }
+
+        vector<Stroke> stroke_pool = {};
+
+        for (int i = 0; i < height; i += Brush_Size[b])
+        {
+            for (int j = 0; j < width; j += Brush_Size[b])
+            {
+                double pixel_buffer_old[4], pixel_buffer_new[4];                
+
+                // avg color for original & current canvas at given location
+                GET_2D_CONVOLUTION(data, 4, height, width, kernel, Brush_Size[b], Brush_Size[b], pixel_buffer_old, i - ((int) (Brush_Size[b] / 2)), j - ((int) (Brush_Size[b] / 2)), scale);
+                GET_2D_CONVOLUTION(Original, 4, height, width, kernel, Brush_Size[b], Brush_Size[b], pixel_buffer_new, i - ((int) (Brush_Size[b] / 2)), j - ((int) (Brush_Size[b] / 2)), scale);
+                
+                double pixel_buffer_err = abs((pixel_buffer_old[ RED ] + pixel_buffer_old[ GREEN ] + pixel_buffer_old[ BLUE ]) - \
+                                              (pixel_buffer_new[ RED ] + pixel_buffer_new[ GREEN ] + pixel_buffer_new[ BLUE ]));
+                
+                // T = ... ? I don't know
+                if ( !b || pixel_buffer_err * (Brush_Size[b] * Brush_Size[b]) > 512 )
+                {
+                    int y = i + rand() % 5 - 2;
+                    int x = j + rand() % 5 - 2;
+                   stroke_pool.push_back(Stroke(Brush_Size[b], x, y, pixel_buffer_new[ RED ], pixel_buffer_new[ GREEN ], pixel_buffer_new[ BLUE ], pixel_buffer_new[ ALPHA ]));
+                }
+            }
+        }
+
+        random_shuffle(begin(stroke_pool), stroke_pool.end());
+
+        for (auto i = stroke_pool.begin(); i != stroke_pool.end(); i++)
+        {
+            Paint_Stroke(*i);
+        }
+
+        for (int i = 0; i < Brush_Size[b]; ++i)
+        {
+            delete[] kernel;
+        }
+        delete[] kernel;
+    }
+
+    delete[] Original;
+
+    return true;
 }
 
 
