@@ -31,6 +31,7 @@ target_link_libraries(ImageEditing targa fltk fltk_images comctl32)
 enable_testing()
 
 add_test(NAME test COMMAND mkdir -p test_result)
+
 add_test(NAME gray COMMAND ImageEditing -headless ../test/gray.txt)
 add_test(NAME quant-unif COMMAND ImageEditing -headless ../test/quant-unif.txt)
 add_test(NAME quant-pop COMMAND ImageEditing -headless ../test/quant-pop.txt)
@@ -51,3 +52,9 @@ add_test(NAME half COMMAND ImageEditing -headless ../test/half.txt)
 add_test(NAME double COMMAND ImageEditing -headless ../test/double.txt)
 add_test(NAME scale COMMAND ImageEditing -headless ../test/scale.txt)
 add_test(NAME rotate COMMAND ImageEditing -headless ../test/rotate.txt)
+
+add_test(NAME comp-over COMMAND ImageEditing -headless ../test/comp-over.txt)
+add_test(NAME comp-in COMMAND ImageEditing -headless ../test/comp-in.txt)
+add_test(NAME comp-out COMMAND ImageEditing -headless ../test/comp-out.txt)
+add_test(NAME comp-atop COMMAND ImageEditing -headless ../test/comp-atop.txt)
+add_test(NAME comp-xor COMMAND ImageEditing -headless ../test/comp-xor.txt)

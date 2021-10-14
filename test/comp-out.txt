@@ -1,0 +1,3 @@
+load ../images/green.tga
+comp-out ../images/red.tga
+save test_result/comp-out.tga

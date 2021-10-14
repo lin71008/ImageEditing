@@ -670,8 +670,27 @@ bool TargaImage::Comp_Over(TargaImage* pImage)
         return false;
     }
 
-    ClearToBlack();
-    return false;
+    for (int i = 0; i < 4 * (width * height); i += 4)
+    {
+        double F_r = 0, F_g = 0, F_b = 0, F_a = 0;
+        double G_r = 0, G_g = 0, G_b = 0, G_a = 0;
+
+        GET_R8G8B8A8(data, i, F_r, F_g, F_b, F_a);
+        GET_R8G8B8A8(pImage->data, i, G_r, G_g, G_b, G_a);
+
+        F_a /= 255.0;
+        G_a /= 255.0;
+
+        double r, g, b, a;
+        r = F_r + (1 - F_a) * G_a * G_r;
+        g = F_g + (1 - F_a) * G_a * G_g;
+        b = F_b + (1 - F_a) * G_a * G_b;
+        a = 255.0 * (F_a + (1 - F_a) * G_a);
+
+        SET_R8G8B8A8(data, i, r, g, b, a);
+    }
+
+    return true;
 }// Comp_Over
 
 
@@ -689,8 +708,27 @@ bool TargaImage::Comp_In(TargaImage* pImage)
         return false;
     }
 
-    ClearToBlack();
-    return false;
+    for (int i = 0; i < 4 * (width * height); i += 4)
+    {
+        double F_r = 0, F_g = 0, F_b = 0, F_a = 0;
+        double G_r = 0, G_g = 0, G_b = 0, G_a = 0;
+
+        GET_R8G8B8A8(data, i, F_r, F_g, F_b, F_a);
+        GET_R8G8B8A8(pImage->data, i, G_r, G_g, G_b, G_a);
+
+        F_a /= 255.0;
+        G_a /= 255.0;
+
+        double r, g, b, a;
+        r = G_a * F_r;
+        g = G_a * F_g;
+        b = G_a * F_b;
+        a = 255.0 * (F_a * G_a);
+
+        SET_R8G8B8A8(data, i, r, g, b, a);
+    }
+
+    return true;
 }// Comp_In
 
 
@@ -708,8 +746,27 @@ bool TargaImage::Comp_Out(TargaImage* pImage)
         return false;
     }
 
-    ClearToBlack();
-    return false;
+    for (int i = 0; i < 4 * (width * height); i += 4)
+    {
+        double F_r = 0, F_g = 0, F_b = 0, F_a = 0;
+        double G_r = 0, G_g = 0, G_b = 0, G_a = 0;
+
+        GET_R8G8B8A8(data, i, F_r, F_g, F_b, F_a);
+        GET_R8G8B8A8(pImage->data, i, G_r, G_g, G_b, G_a);
+
+        F_a /= 255.0;
+        G_a /= 255.0;
+
+        double r, g, b, a;
+        r = (1 - G_a) * F_r;
+        g = (1 - G_a) * F_g;
+        b = (1 - G_a) * F_b;
+        a = 255.0 * (F_a * (1 - G_a));
+
+        SET_R8G8B8A8(data, i, r, g, b, a);
+    }
+
+    return true;
 }// Comp_Out
 
 
@@ -727,8 +784,27 @@ bool TargaImage::Comp_Atop(TargaImage* pImage)
         return false;
     }
 
-    ClearToBlack();
-    return false;
+    for (int i = 0; i < 4 * (width * height); i += 4)
+    {
+        double F_r = 0, F_g = 0, F_b = 0, F_a = 0;
+        double G_r = 0, G_g = 0, G_b = 0, G_a = 0;
+
+        GET_R8G8B8A8(data, i, F_r, F_g, F_b, F_a);
+        GET_R8G8B8A8(pImage->data, i, G_r, G_g, G_b, G_a);
+
+        F_a /= 255.0;
+        G_a /= 255.0;
+
+        double r, g, b, a;
+        r = G_a * F_r + (1 - F_a) * G_r;
+        g = G_a * F_g + (1 - F_a) * G_g;
+        b = G_a * F_b + (1 - F_a) * G_b;
+        a = 255.0 * (G_a);
+
+        SET_R8G8B8A8(data, i, r, g, b, a);
+    }
+
+    return true;
 }// Comp_Atop
 
 
@@ -746,8 +822,27 @@ bool TargaImage::Comp_Xor(TargaImage* pImage)
         return false;
     }
 
-    ClearToBlack();
-    return false;
+    for (int i = 0; i < 4 * (width * height); i += 4)
+    {
+        double F_r = 0, F_g = 0, F_b = 0, F_a = 0;
+        double G_r = 0, G_g = 0, G_b = 0, G_a = 0;
+
+        GET_R8G8B8A8(data, i, F_r, F_g, F_b, F_a);
+        GET_R8G8B8A8(pImage->data, i, G_r, G_g, G_b, G_a);
+
+        F_a /= 255.0;
+        G_a /= 255.0;
+
+        double r, g, b, a;
+        r = (1 - G_a) * F_r + (1 - F_a) * G_r;
+        g = (1 - G_a) * F_g + (1 - F_a) * G_g;
+        b = (1 - G_a) * F_b + (1 - F_a) * G_b;
+        a = 255.0 * abs(F_a - G_a);
+
+        SET_R8G8B8A8(data, i, r, g, b, a);
+    }
+
+    return true;
 }// Comp_Xor
 
 

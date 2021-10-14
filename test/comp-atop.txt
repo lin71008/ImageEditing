@@ -1,0 +1,3 @@
+load ../images/green.tga
+comp-atop ../images/red.tga
+save test_result/comp-atop.tga
